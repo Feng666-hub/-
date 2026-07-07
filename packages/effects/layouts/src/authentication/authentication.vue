@@ -27,7 +27,7 @@ withDefaults(defineProps<Props>(), {
   pageTitle: '',
   sloganImage: '',
   toolbar: true,
-  toolbarList: () => ['color', 'language', 'layout', 'theme'],
+  toolbarList: () => ['color', 'language', 'theme'],
 });
 
 const { authPanelCenter, authPanelLeft, authPanelRight, isDark } =
