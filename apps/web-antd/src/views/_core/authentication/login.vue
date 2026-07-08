@@ -50,9 +50,9 @@ const formSchema = computed((): VbenFormSchema[] => {
       <Button class="w-1/2" size="large"> 手机号登录 </Button>
     </template>
     <template #qrcode-login-button>
-      <Button class="ml-4 w-1/2" size="large">
-        <MdiWechat class="mr-1 text-green-500" />
-        微信扫码登录
+      <Button class="ml-4 flex w-1/2 items-center justify-center" size="large">
+        <MdiWechat class="text-green-500" />
+        <span class="ml-1">微信扫码登录</span>
       </Button>
     </template>
   </AuthenticationLogin>
