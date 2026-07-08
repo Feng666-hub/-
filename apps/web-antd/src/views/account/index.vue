@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, h, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { useUserStore } from '@vben/stores';
@@ -254,54 +254,47 @@ async function handleBindingSubmit() {
 
 // ==================== 微信解绑 ====================
 
-async function handleUnbindWechat() {
-  Modal.confirm({
-    title: '确认解绑',
-    content: '解绑后将无法使用微信登录，是否确认解绑？',
-    okText: '确认解绑',
-    cancelText: '取消',
-    okType: 'danger',
-    onOk: async () => {
-      try {
-        // 先验证密码获取token
-        const password = await new Promise<string>((resolve, reject) => {
-          Modal.confirm({
-            title: '验证身份',
-            okText: '确认',
-            cancelText: '取消',
-            icon: null as any,
-            content: h('div', [
-              h('p', { class: 'mb-2' }, '请输入当前登录密码进行验证'),
-              h(InputPassword, {
-                placeholder: '请输入密码',
-                id: 'unbind-wechat-password',
-              }),
-            ]),
-            onOk: () => {
-              const input = document.querySelector(
-                '#unbind-wechat-password input',
-              ) as HTMLInputElement;
-              if (input?.value) {
-                resolve(input.value);
-              } else {
-                message.error('请输入密码');
-                reject(new Error('未输入密码'));
-              }
-            },
-          });
-        });
+const unbindWechatModalVisible = ref(false);
+const unbindWechatLoading = ref(false);
+const unbindWechatPassword = ref('');
 
-        await verifyPasswordForBindingApi(password);
-        await unbindWechatApi();
-        message.success('微信解绑成功');
-        await authStore.fetchUserInfo();
-      } catch (error: any) {
-        if (error.message !== '未输入密码') {
+function handleUnbindWechat() {
+  unbindWechatPassword.value = '';
+  unbindWechatModalVisible.value = true;
+}
+
+async function handleUnbindWechatConfirm() {
+  if (!unbindWechatPassword.value) {
+    message.error('请输入密码');
+    return;
+  }
+
+  unbindWechatLoading.value = true;
+  try {
+    await verifyPasswordForBindingApi(unbindWechatPassword.value);
+    unbindWechatModalVisible.value = false;
+
+    Modal.confirm({
+      title: '确认解绑',
+      content: '解绑后将无法使用微信登录，是否确认解绑？',
+      okText: '确认解绑',
+      cancelText: '取消',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await unbindWechatApi();
+          message.success('微信解绑成功');
+          await authStore.fetchUserInfo();
+        } catch (error: any) {
           message.error(error.message || '解绑失败');
         }
-      }
-    },
-  });
+      },
+    });
+  } catch (error: any) {
+    message.error(error.message || '密码验证失败');
+  } finally {
+    unbindWechatLoading.value = false;
+  }
 }
 
 function handleBeforeUpload(file: File) {
@@ -624,6 +617,24 @@ function handleBeforeUpload(file: File) {
             {{ codeCountdown > 0 ? `${codeCountdown}s` : '发送验证码' }}
           </Button>
         </div>
+      </FormItem>
+    </Form>
+  </Modal>
+
+  <!-- 微信解绑密码验证弹窗 -->
+  <Modal
+    v-model:open="unbindWechatModalVisible"
+    :confirm-loading="unbindWechatLoading"
+    title="验证身份"
+    @cancel="unbindWechatModalVisible = false"
+    @ok="handleUnbindWechatConfirm"
+  >
+    <Form class="mt-4" layout="vertical">
+      <FormItem label="登录密码" required>
+        <InputPassword
+          v-model:value="unbindWechatPassword"
+          placeholder="请输入当前登录密码进行验证"
+        />
       </FormItem>
     </Form>
   </Modal>
