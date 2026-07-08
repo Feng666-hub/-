@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, h, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { useUserStore } from '@vben/stores';
@@ -10,11 +10,22 @@ import {
   Form,
   FormItem,
   Input,
+  InputPassword,
   message,
+  Modal,
   Upload,
 } from 'ant-design-vue';
 
-import { updateStaffApi } from '#/api';
+import {
+  bindAccountApi,
+  changePasswordApi,
+  rebindAccountApi,
+  sendBindingCodeApi,
+  unbindAccountApi,
+  unbindWechatApi,
+  updateStaffApi,
+  verifyPasswordForBindingApi,
+} from '#/api';
 import { useAuthStore } from '#/store';
 
 defineOptions({ name: 'AccountProfile' });
@@ -35,6 +46,27 @@ const formState = reactive({
 });
 
 const userInfo = computed(() => userStore.userInfo);
+
+// 修改密码相关
+const passwordModalVisible = ref(false);
+const passwordLoading = ref(false);
+const passwordForm = reactive({
+  newPassword: '',
+  confirmPassword: '',
+});
+
+// 绑定/解绑相关
+const bindingModalVisible = ref(false);
+const bindingType = ref<'email' | 'phone'>('email');
+const bindingAction = ref<'bind' | 'rebind' | 'unbind'>('bind');
+const bindingLoading = ref(false);
+const bindingForm = reactive({
+  account: '',
+  code: '',
+  password: '',
+});
+const codeSending = ref(false);
+const codeCountdown = ref(0);
 
 onMounted(() => {
   if (route.query.tab === 'settings') {
@@ -75,24 +107,201 @@ async function handleSave() {
   }
 }
 
-function handleBindPhone() {
-  message.info('绑定手机号功能开发中');
-}
-
-function handleChangeEmail() {
-  message.info('换绑邮箱功能开发中');
-}
-
-function handleUnbindEmail() {
-  message.info('解绑邮箱功能开发中');
-}
-
-function handleUnbindWechat() {
-  message.info('解绑微信功能开发中');
-}
+// ==================== 密码修改 ====================
 
 function handleChangePassword() {
-  message.info('修改密码功能开发中');
+  passwordForm.newPassword = '';
+  passwordForm.confirmPassword = '';
+  passwordModalVisible.value = true;
+}
+
+async function handlePasswordSubmit() {
+  if (!userInfo.value) return;
+
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    message.error('两次输入的密码不一致');
+    return;
+  }
+
+  if (passwordForm.newPassword.length < 6) {
+    message.error('新密码长度至少6位');
+    return;
+  }
+
+  passwordLoading.value = true;
+  try {
+    await changePasswordApi(
+      String(userInfo.value.userId),
+      passwordForm.newPassword,
+    );
+    message.success('密码修改成功');
+    passwordModalVisible.value = false;
+  } catch (error: any) {
+    message.error(error.message || '密码修改失败');
+  } finally {
+    passwordLoading.value = false;
+  }
+}
+
+// ==================== 绑定/解绑 ====================
+
+function openBindingModal(
+  type: 'email' | 'phone',
+  action: 'bind' | 'rebind' | 'unbind',
+) {
+  bindingType.value = type;
+  bindingAction.value = action;
+  bindingForm.account = '';
+  bindingForm.code = '';
+  bindingForm.password = '';
+  codeCountdown.value = 0;
+  bindingModalVisible.value = true;
+}
+
+function getBindingTitle() {
+  const typeLabel = bindingType.value === 'email' ? '邮箱' : '手机号';
+  const actionLabels = {
+    bind: '绑定',
+    rebind: '换绑',
+    unbind: '解绑',
+  };
+  return `${actionLabels[bindingAction.value]}${typeLabel}`;
+}
+
+function getBindingButtonText() {
+  const actionLabels = {
+    bind: '绑定',
+    rebind: '换绑',
+    unbind: '解绑',
+  };
+  return actionLabels[bindingAction.value];
+}
+
+async function handleSendCode() {
+  if (!bindingForm.account) {
+    message.error(`请输入${bindingType.value === 'email' ? '邮箱' : '手机号'}`);
+    return;
+  }
+
+  codeSending.value = true;
+  try {
+    await sendBindingCodeApi(
+      bindingType.value,
+      bindingForm.account,
+      bindingAction.value,
+    );
+    message.success('验证码已发送');
+    codeCountdown.value = 60;
+    const timer = setInterval(() => {
+      codeCountdown.value--;
+      if (codeCountdown.value <= 0) {
+        clearInterval(timer);
+      }
+    }, 1000);
+  } catch (error: any) {
+    message.error(error.message || '发送验证码失败');
+  } finally {
+    codeSending.value = false;
+  }
+}
+
+async function handleBindingSubmit() {
+  bindingLoading.value = true;
+  try {
+    if (bindingAction.value === 'unbind') {
+      // 解绑需要先验证密码获取token
+      if (!bindingForm.password) {
+        message.error('请输入登录密码进行验证');
+        return;
+      }
+      const { verifyToken } = await verifyPasswordForBindingApi(
+        bindingForm.password,
+      );
+      await unbindAccountApi(bindingType.value, verifyToken);
+      message.success('解绑成功');
+    } else if (bindingAction.value === 'bind') {
+      await bindAccountApi(
+        bindingType.value,
+        bindingForm.account,
+        bindingForm.code,
+      );
+      message.success('绑定成功');
+    } else {
+      // 换绑需要先验证密码获取token
+      if (!bindingForm.password) {
+        message.error('请输入登录密码进行验证');
+        return;
+      }
+      const { verifyToken } = await verifyPasswordForBindingApi(
+        bindingForm.password,
+      );
+      await rebindAccountApi(
+        bindingType.value,
+        bindingForm.account,
+        bindingForm.code,
+        verifyToken,
+      );
+      message.success('换绑成功');
+    }
+    bindingModalVisible.value = false;
+    await authStore.fetchUserInfo();
+  } catch (error: any) {
+    message.error(error.message || '操作失败');
+  } finally {
+    bindingLoading.value = false;
+  }
+}
+
+// ==================== 微信解绑 ====================
+
+async function handleUnbindWechat() {
+  Modal.confirm({
+    title: '确认解绑',
+    content: '解绑后将无法使用微信登录，是否确认解绑？',
+    okText: '确认解绑',
+    cancelText: '取消',
+    okType: 'danger',
+    onOk: async () => {
+      try {
+        // 先验证密码获取token
+        const password = await new Promise<string>((resolve, reject) => {
+          Modal.confirm({
+            title: '验证身份',
+            okText: '确认',
+            cancelText: '取消',
+            icon: null as any,
+            content: h('div', [
+              h('p', { class: 'mb-2' }, '请输入当前登录密码进行验证'),
+              h(InputPassword, {
+                placeholder: '请输入密码',
+                id: 'unbind-wechat-password',
+              }),
+            ]),
+            onOk: () => {
+              const input = document.querySelector(
+                '#unbind-wechat-password input',
+              ) as HTMLInputElement;
+              if (input?.value) {
+                resolve(input.value);
+              } else {
+                message.error('请输入密码');
+                reject(new Error('未输入密码'));
+              }
+            },
+          });
+        });
+
+        await verifyPasswordForBindingApi(password);
+        await unbindWechatApi();
+        message.success('微信解绑成功');
+        await authStore.fetchUserInfo();
+      } catch (error: any) {
+        if (error.message !== '未输入密码') {
+          message.error(error.message || '解绑失败');
+        }
+      }
+    },
+  });
 }
 
 function handleBeforeUpload(file: File) {
@@ -244,9 +453,29 @@ function handleBeforeUpload(file: File) {
           >
             <div>
               <div class="font-medium">手机号</div>
-              <div class="mt-1 text-sm text-gray-500">未绑定</div>
+              <div class="mt-1 text-sm text-gray-500">
+                {{ userInfo?.phoneNum || '未绑定' }}
+              </div>
             </div>
-            <Button type="link" @click="handleBindPhone">绑定</Button>
+            <div v-if="userInfo?.phoneNum" class="flex gap-2">
+              <Button type="link" @click="openBindingModal('phone', 'rebind')">
+                换绑
+              </Button>
+              <Button
+                danger
+                type="link"
+                @click="openBindingModal('phone', 'unbind')"
+              >
+                解绑
+              </Button>
+            </div>
+            <Button
+              v-else
+              type="link"
+              @click="openBindingModal('phone', 'bind')"
+            >
+              绑定
+            </Button>
           </div>
 
           <!-- 邮箱 -->
@@ -259,12 +488,25 @@ function handleBeforeUpload(file: File) {
                 {{ userInfo?.email || '未绑定' }}
               </div>
             </div>
-            <div class="flex gap-2">
-              <Button type="link" @click="handleChangeEmail">换绑</Button>
-              <Button danger type="link" @click="handleUnbindEmail">
+            <div v-if="userInfo?.email" class="flex gap-2">
+              <Button type="link" @click="openBindingModal('email', 'rebind')">
+                换绑
+              </Button>
+              <Button
+                danger
+                type="link"
+                @click="openBindingModal('email', 'unbind')"
+              >
                 解绑
               </Button>
             </div>
+            <Button
+              v-else
+              type="link"
+              @click="openBindingModal('email', 'bind')"
+            >
+              绑定
+            </Button>
           </div>
 
           <!-- 微信号 -->
@@ -282,7 +524,9 @@ function handleBeforeUpload(file: File) {
                 </div>
               </div>
             </div>
-            <Button danger type="link" @click="handleUnbindWechat">解绑</Button>
+            <Button danger type="link" @click="handleUnbindWechat">
+              解绑
+            </Button>
           </div>
 
           <!-- 密码 -->
@@ -290,10 +534,97 @@ function handleBeforeUpload(file: File) {
             <div>
               <div class="font-medium">密码</div>
             </div>
-            <Button type="link" @click="handleChangePassword">修改密码</Button>
+            <Button type="link" @click="handleChangePassword">
+              修改密码
+            </Button>
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- 修改密码弹窗 -->
+  <Modal
+    v-model:open="passwordModalVisible"
+    :confirm-loading="passwordLoading"
+    title="修改密码"
+    @cancel="passwordModalVisible = false"
+    @ok="handlePasswordSubmit"
+  >
+    <Form class="mt-4" layout="vertical">
+      <FormItem label="新密码" required>
+        <InputPassword
+          v-model:value="passwordForm.newPassword"
+          placeholder="请输入新密码"
+        />
+      </FormItem>
+      <FormItem label="确认密码" required>
+        <InputPassword
+          v-model:value="passwordForm.confirmPassword"
+          placeholder="请再次输入新密码"
+        />
+      </FormItem>
+    </Form>
+  </Modal>
+
+  <!-- 绑定/解绑弹窗 -->
+  <Modal
+    v-model:open="bindingModalVisible"
+    :confirm-loading="bindingLoading"
+    :ok-button-props="{ danger: bindingAction === 'unbind' }"
+    :ok-text="getBindingButtonText()"
+    :title="getBindingTitle()"
+    @cancel="bindingModalVisible = false"
+    @ok="handleBindingSubmit"
+  >
+    <Form class="mt-4" layout="vertical">
+      <!-- 解绑和换绑需要验证密码 -->
+      <FormItem
+        v-if="bindingAction === 'unbind' || bindingAction === 'rebind'"
+        label="登录密码"
+        required
+      >
+        <InputPassword
+          v-model:value="bindingForm.password"
+          placeholder="请输入当前登录密码进行验证"
+        />
+      </FormItem>
+
+      <!-- 绑定和换绑需要输入新账号 -->
+      <FormItem
+        v-if="bindingAction === 'bind' || bindingAction === 'rebind'"
+        :label="bindingType === 'email' ? '新邮箱' : '新手机号'"
+        required
+      >
+        <Input
+          v-model:value="bindingForm.account"
+          :placeholder="
+            bindingType === 'email' ? '请输入邮箱地址' : '请输入手机号'
+          "
+        />
+      </FormItem>
+
+      <!-- 绑定和换绑需要验证码 -->
+      <FormItem
+        v-if="bindingAction === 'bind' || bindingAction === 'rebind'"
+        label="验证码"
+        required
+      >
+        <div class="flex gap-2">
+          <Input
+            v-model:value="bindingForm.code"
+            class="flex-1"
+            placeholder="请输入验证码"
+          />
+          <Button
+            :disabled="codeCountdown > 0"
+            :loading="codeSending"
+            @click="handleSendCode"
+          >
+            {{ codeCountdown > 0 ? `${codeCountdown}s` : '发送验证码' }}
+          </Button>
+        </div>
+      </FormItem>
+    </Form>
+  </Modal>
 </template>

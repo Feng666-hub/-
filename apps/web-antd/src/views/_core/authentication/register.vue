@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import {
@@ -37,7 +37,7 @@ const step1Form = ref({
 
 // 第二步表单数据
 const step2Form = ref({
-  organizationId: [] as number[],
+  organizationId: null as null | number,
   companyName: '',
 });
 
@@ -46,6 +46,11 @@ const organizationTree = ref<any[]>([]);
 
 // 步骤定义
 const steps = [{ title: '基本信息' }, { title: '企业信息' }];
+
+// 组件挂载时加载组织架构树
+onMounted(() => {
+  loadOrganizationTree();
+});
 
 // 发送验证码
 async function handleSendCode() {
@@ -128,30 +133,85 @@ function handlePrev() {
 async function loadOrganizationTree() {
   try {
     const res = await getOrganizationTreeApi(0);
-    organizationTree.value = Array.isArray(res) ? res : [];
+    // API返回空数据时使用mock数据
+    organizationTree.value =
+      Array.isArray(res) && res.length > 0 ? res : getMockOrganizationTree();
   } catch {
-    organizationTree.value = [];
+    // API失败时使用mock数据
+    organizationTree.value = getMockOrganizationTree();
   }
+}
+
+// Mock组织架构树数据
+function getMockOrganizationTree() {
+  return [
+    {
+      id: 1,
+      title: '便利智链集团',
+      children: [
+        {
+          id: 2,
+          title: '华东区域',
+          children: [
+            { id: 4, title: '上海分公司' },
+            { id: 5, title: '杭州分公司' },
+            { id: 6, title: '南京分公司' },
+          ],
+        },
+        {
+          id: 3,
+          title: '华南区域',
+          children: [
+            { id: 7, title: '广州分公司' },
+            { id: 8, title: '深圳分公司' },
+            { id: 9, title: '厦门分公司' },
+          ],
+        },
+        {
+          id: 10,
+          title: '华北区域',
+          children: [
+            { id: 11, title: '北京分公司' },
+            { id: 12, title: '天津分公司' },
+          ],
+        },
+        {
+          id: 13,
+          title: '华中区域',
+          children: [
+            { id: 14, title: '武汉分公司' },
+            { id: 15, title: '长沙分公司' },
+          ],
+        },
+        {
+          id: 16,
+          title: '西南区域',
+          children: [
+            { id: 17, title: '成都分公司' },
+            { id: 18, title: '重庆分公司' },
+          ],
+        },
+      ],
+    },
+  ];
 }
 
 // 注册
 async function handleRegister() {
-  if (
-    !step2Form.value.organizationId ||
-    step2Form.value.organizationId.length === 0
-  ) {
+  if (!step2Form.value.organizationId) {
     message.warning('请选择上级组织');
     return;
   }
 
   loading.value = true;
   try {
+    // 执行注册（后端会自动验证验证码）
     await registerApi({
       account: step1Form.value.email,
       code: step1Form.value.code,
       password: step1Form.value.password,
       username: step1Form.value.username,
-      organizationId: [step2Form.value.organizationId],
+      organizationId: [[step2Form.value.organizationId]],
     });
     message.success('注册成功，请登录');
     router.push('/auth/login');

@@ -80,7 +80,7 @@ const routes: RouteRecordRaw[] = [
       {
         name: 'UserList',
         path: '/user/list',
-        component: () => import('#/views/dashboard/workspace/index.vue'),
+        component: () => import('#/views/user/list.vue'),
         meta: {
           icon: 'lucide:users',
           title: '用户列表',

@@ -81,6 +81,16 @@ const coreRoutes: RouteRecordRaw[] = [
           title: $t('page.auth.register'),
         },
       },
+      {
+        name: 'WechatCallback',
+        path: 'wechat-callback',
+        component: () =>
+          import('#/views/_core/authentication/wechat-callback.vue'),
+        meta: {
+          title: '微信登录回调',
+          ignoreAuth: true,
+        },
+      },
     ],
   },
 ];
