@@ -16,6 +16,23 @@ export namespace AuthApi {
     data: string;
     status: number;
   }
+
+  /** 注册接口参数 */
+  export interface RegisterParams {
+    account?: string;
+    code?: string;
+    password?: string;
+    username?: string;
+    organizationId?: number[][];
+  }
+
+  /** 组织架构树节点 */
+  export interface OrganizationTree {
+    id: number;
+    title: string;
+    parentId?: number;
+    children?: OrganizationTree[];
+  }
 }
 
 /**
@@ -49,4 +66,40 @@ export async function logoutApi() {
  */
 export async function getAccessCodesApi() {
   return requestClient.post<string[]>('/v1/auth/codes');
+}
+
+/**
+ * 发送邮箱验证码
+ */
+export async function sendEmailCodeApi(email: string) {
+  return requestClient.get(`/v1/Satff/Emailcode?email=${email}`);
+}
+
+/**
+ * 校验邮箱验证码
+ */
+export async function checkEmailCodeApi(
+  email: string,
+  code: string,
+  password: string,
+) {
+  return requestClient.get(
+    `/v1/Satff/CheckEmailCode?email=${email}&inputCode=${code}&password=${password}`,
+  );
+}
+
+/**
+ * 注册用户
+ */
+export async function registerApi(data: AuthApi.RegisterParams) {
+  return requestClient.post('/v1/Satff/Register', data);
+}
+
+/**
+ * 获取组织架构树
+ */
+export async function getOrganizationTreeApi(orgId: number = 0) {
+  return requestClient.get(
+    `/v1/Organizationstructure/GetOrganizationstructureTree?orgId=${orgId}`,
+  );
 }
