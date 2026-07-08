@@ -10,4 +10,11 @@ export const overridesPreferences = defineOverridesPreferences({
   app: {
     name: import.meta.env.VITE_APP_TITLE,
   },
+  copyright: {
+    companyName: '天门欣尚商用设备制造有限公司',
+    companySiteLink: '',
+    date: '2026',
+    icp: '鄂ICP备2026027252号-1',
+    icpLink: '',
+  },
 });
