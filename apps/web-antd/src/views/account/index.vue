@@ -214,7 +214,7 @@ async function handleBindingSubmit() {
         message.error('请输入登录密码进行验证');
         return;
       }
-      const { verifyToken } = await verifyPasswordForBindingApi(
+      const verifyToken = await verifyPasswordForBindingApi(
         bindingForm.password,
       );
       await unbindAccountApi(bindingType.value, verifyToken);
@@ -232,7 +232,7 @@ async function handleBindingSubmit() {
         message.error('请输入登录密码进行验证');
         return;
       }
-      const { verifyToken } = await verifyPasswordForBindingApi(
+      const verifyToken = await verifyPasswordForBindingApi(
         bindingForm.password,
       );
       await rebindAccountApi(
