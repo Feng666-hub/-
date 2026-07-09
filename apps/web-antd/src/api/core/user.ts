@@ -87,3 +87,25 @@ export async function approveUserApi(staffId: number, approved: number) {
 export async function deleteUserApi(staffId: number) {
   return requestClient.get(`/v1/Satff/DeleteStaff?staffId=${staffId}`);
 }
+
+/** 编辑用户 */
+export async function editUserApi(data: {
+  email?: string;
+  phoneNum?: string;
+  realName?: string;
+  sex?: number;
+  sId: number;
+}) {
+  return requestClient.post('/v1/Satff/UpdateStaff', data);
+}
+
+/** 重置用户密码 */
+export async function resetUserPasswordApi(
+  staffId: number,
+  newPassword: string,
+) {
+  return requestClient.post('/v1/Satff/UpdateStaff', {
+    sId: staffId,
+    passWord: newPassword,
+  });
+}

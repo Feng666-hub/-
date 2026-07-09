@@ -78,6 +78,15 @@ const routes: RouteRecordRaw[] = [
     path: '/user',
     children: [
       {
+        name: 'OrganizationList',
+        path: '/user/organization',
+        component: () => import('#/views/organization/index.vue'),
+        meta: {
+          icon: 'lucide:network',
+          title: '组织管理',
+        },
+      },
+      {
         name: 'UserList',
         path: '/user/list',
         component: () => import('#/views/user/list.vue'),
