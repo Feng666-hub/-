@@ -229,10 +229,9 @@ export async function unbindAccountApi(
  * 验证登录密码，获取一次性身份Token
  */
 export async function verifyPasswordForBindingApi(password: string) {
-  return requestClient.post<{ verifyToken: string }>(
-    '/v1/account-binding/verify-password',
-    { password },
-  );
+  return requestClient.post<string>('/v1/account-binding/verify-password', {
+    password,
+  });
 }
 
 // ==================== 微信绑定/解绑 API ====================
